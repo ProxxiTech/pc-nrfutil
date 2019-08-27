@@ -49,6 +49,8 @@ from serial.serialutil import SerialException
 # Nordic Semiconductor imports
 from nordicsemi.dfu.dfu_transport   import DfuTransport, DfuEvent, TRANSPORT_LOGGING_LEVEL
 from pc_ble_driver_py.exceptions    import NordicSemiException, IllegalStateException
+from nordicsemi.lister.device_lister import DeviceLister
+from nordicsemi.dfu.dfu_trigger import DFUTrigger
 
 class ValidationException(NordicSemiException):
     """"
@@ -147,6 +149,7 @@ class DfuTransportSerial(DfuTransport):
 
     DEFAULT_BAUD_RATE = 115200
     DEFAULT_FLOW_CONTROL = True
+    DEFAULT_TIMEOUT = 30.0  # Timeout time for board response
     DEFAULT_SERIAL_PORT_TIMEOUT = 1.0  # Timeout time on serial port read
     DEFAULT_PRN                 = 0
     DEFAULT_DO_PING = True
@@ -168,7 +171,7 @@ class DfuTransportSerial(DfuTransport):
                  com_port,
                  baud_rate=DEFAULT_BAUD_RATE,
                  flow_control=DEFAULT_FLOW_CONTROL,
-                 timeout=DEFAULT_SERIAL_PORT_TIMEOUT,
+                 timeout=DEFAULT_TIMEOUT,
                  prn=DEFAULT_PRN,
                  do_ping=DEFAULT_DO_PING):
 
@@ -190,22 +193,22 @@ class DfuTransportSerial(DfuTransport):
 
     def open(self):
         super(DfuTransportSerial, self).open()
-
         try:
+            self.__ensure_bootloader()
             self.serial_port = Serial(port=self.com_port,
-                baudrate=self.baud_rate, rtscts=self.flow_control, timeout=self.timeout)
+                baudrate=self.baud_rate, rtscts=self.flow_control, timeout=self.DEFAULT_SERIAL_PORT_TIMEOUT)
             self.dfu_adapter = DFUAdapter(self.serial_port)
         except Exception as e:
             raise NordicSemiException("Serial port could not be opened on {0}"
-            + ". Reason: {1}".format(self.com_port, e.message))
+              ". Reason: {1}".format(self.com_port, e.strerror))
 
         if self.do_ping:
             ping_success = False
             start = datetime.now()
-            while datetime.now() - start < timedelta(seconds=self.timeout):
+            while (datetime.now() - start < timedelta(seconds=self.timeout)
+                    and ping_success == False):
                 if self.__ping() == True:
                     ping_success = True
-                time.sleep(1)
 
             if ping_success == False:
                 raise NordicSemiException("No ping response after opening COM port")
@@ -301,6 +304,54 @@ class DfuTransportSerial(DfuTransport):
                 raise NordicSemiException("Failed to send firmware")
 
             self._send_event(event_type=DfuEvent.PROGRESS_EVENT, progress=len(data))
+
+    def __ensure_bootloader(self):
+        lister = DeviceLister()
+
+        device = None
+        start = datetime.now()
+        while not device and datetime.now() - start < timedelta(seconds=self.timeout):
+            time.sleep(0.5)
+            device = lister.get_device(com=self.com_port)
+
+        if device:
+            device_serial_number = device.serial_number
+
+            if not self.__is_device_in_bootloader_mode(device):
+                retry_count = 10
+                wait_time_ms = 500
+
+                trigger = DFUTrigger()
+                try:
+                    trigger.enter_bootloader_mode(device)
+                    logger.info("Serial: DFU bootloader was triggered")
+                except NordicSemiException as err:
+                    logger.error(err)
+
+
+                for checks in range(retry_count):
+                    logger.info("Serial: Waiting {} ms for device to enter bootloader {}/{} time"\
+                    .format(500, checks + 1, retry_count))
+
+                    time.sleep(wait_time_ms / 1000.0)
+
+                    device = lister.get_device(serial_number=device_serial_number)
+                    if self.__is_device_in_bootloader_mode(device):
+                        self.com_port = device.get_first_available_com_port()
+                        break
+
+                trigger.clean()
+            if not self.__is_device_in_bootloader_mode(device):
+                logger.info("Serial: Device is either not in bootloader mode, or using an unsupported bootloader.")
+
+    def __is_device_in_bootloader_mode(self, device):
+        if not device:
+            return False
+
+        #  Return true if nrf bootloader or Jlink interface detected.
+        return ((device.vendor_id.lower() == '1915' and device.product_id.lower() == '521f') # nRF52 SDFU USB
+             or (device.vendor_id.lower() == '1366' and device.product_id.lower() == '0105') # JLink CDC UART Port
+             or (device.vendor_id.lower() == '1366' and device.product_id.lower() == '1015'))# JLink CDC UART Port (MSD)
 
     def __set_prn(self):
         logger.debug("Serial: Set Packet Receipt Notification {}".format(self.prn))

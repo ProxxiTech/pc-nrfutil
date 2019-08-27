@@ -33,6 +33,7 @@ that you are using you will need to select a release of this tool compatible wit
 * Version 0.5.2 generates legacy firmware packages compatible with **nRF SDK 11.0 and older**
 * Versions 1.5.0 and later generate modern firmware packages compatible with **nRF SDK 12.0 and newer**
 * Versions 4.0.0 and later generate modern firmware packages compatible with **nRF SDK 15.1 and newer**
+* Versions 5.0.0 and later generate modern firmware packages compatible with **nRF SDK 15.3 and newer**
 
 **Note**: In order to generate firmware images, compatible with **nRF SDK 12.0 to nRF SDK 15.0**, use `--no-backup` switch during generation of DFU settings.
 
@@ -47,8 +48,6 @@ This will also retrieve and install all additional required packages.
 **Note**: Please refer to the [pc-ble-driver-py PyPI installation note on Windows](https://github.com/NordicSemiconductor/pc-ble-driver-py#installing-from-pypi) if you are running nrfutil on this operating system.
 
 **Note**: When installing on macOS, you may need to add ` --ignore-installed six` when running pip. See [issue #79](https://github.com/NordicSemiconductor/pc-nrfutil/issues/79).
-
-**Note**: To use the `dfu ble`, `dfu thread` or `dfu zigbee` option you will need to set up your boards to be able to communicate with your computer.  You can find additional information here: [Hardware setup](https://github.com/NordicSemiconductor/pc-ble-driver/blob/master/Installation.md#hardware-setup).
 
 ## Downloading precompiled Windows executable
 
@@ -66,11 +65,9 @@ To install nrfutil from source the following prerequisites must be satisfied:
 * [pip](https://pip.pypa.io/en/stable/installing.html)
 * setuptools (upgrade to latest version): `pip install -U setuptools`
 
-Additionally, if you want to generate a self-contained executable:  
+Additionally, if you want to generate a self-contained executable:
 
 * PyInstaller: `pip install pyinstaller`
-
-**IMPORTANT NOTE**: py2exe is no longer supported and you must use PyInstaller instead to generate an executable
 
 ### Requirements
 
@@ -89,12 +86,12 @@ python nordicsemi/__main__.py
 
 ### Installing from source
 
-To install the library to the local Python site-packages and script folder:  
+To install the library to the local Python site-packages and script folder:
 ```
 python setup.py install
 ```
 
-To generate a self-contained executable version of the utility:  
+To generate a self-contained executable version of the utility:
 ```
 pyinstaller nrfutil.spec
 
@@ -104,9 +101,7 @@ pyinstaller /full/path/to/nrfutil.spec
 
 **Note**: Some anti-virus programs will stop PyInstaller from executing correctly when it modifies the executable file.
 
-**Note**: Please refer to the [pc-ble-driver-py PyPI installation note on Windows](https://github.com/NordicSemiconductor/pc-ble-driver-py#installing-from-pypi) if you are running nrfutil on this operating system.
-
-**Note**: To use the `dfu ble`, `dfu thread` or `dfu zigbee` option you will need to set up your boards to be able to communicate with your computer.  You can find additional information here: [Hardware setup](https://github.com/NordicSemiconductor/pc-ble-driver/blob/master/Installation.md#hardware-setup).
+**Note**: PyInstaller on macOS may have issues with newer versions of Python 2.7.x., e.g. error message `Failed to execute script pyi_rth_pkgres` at runtime. Try rolling back to Python v2.7.10 if you experience such problems.
 
 ## Usage
 
@@ -142,11 +137,14 @@ SoftDevice            | FWID (sd-req)
 ----------------------| -------------
 `s112_nrf52_6.0.0`    | 0xA7
 `s112_nrf52_6.1.0`    | 0xB0
+`s112_nrf52_6.1.1`    | 0xB8
 `s130_nrf51_1.0.0`    | 0x67
 `s130_nrf51_2.0.0`    | 0x80
 `s132_nrf52_2.0.0`    | 0x81
 `s130_nrf51_2.0.1`    | 0x87
 `s132_nrf52_2.0.1`    | 0x88
+`s212_nrf52_2.0.1`    | 0x8D
+`s332_nrf52_2.0.1`    | 0x8E
 `s132_nrf52_3.0.0`    | 0x8C
 `s132_nrf52_3.1.0`    | 0x91
 `s132_nrf52_4.0.0`    | 0x95
@@ -154,12 +152,22 @@ SoftDevice            | FWID (sd-req)
 `s132_nrf52_4.0.3`    | 0x99
 `s132_nrf52_4.0.4`    | 0x9E
 `s132_nrf52_4.0.5`    | 0x9F
+`s212_nrf52_4.0.5`    | 0x93
+`s332_nrf52_4.0.5`    | 0x94
 `s132_nrf52_5.0.0`    | 0x9D
+`s212_nrf52_5.0.0`    | 0x9C
+`s332_nrf52_5.0.0`    | 0x9B
 `s132_nrf52_5.1.0`    | 0xA5
 `s132_nrf52_6.0.0`    | 0xA8
 `s132_nrf52_6.1.0`    | 0xAF
+`s132_nrf52_6.1.1`    | 0xB7
 `s140_nrf52_6.0.0`    | 0xA9
 `s140_nrf52_6.1.0`    | 0xAE
+`s140_nrf52_6.1.1`    | 0xB6
+`s212_nrf52_6.1.1`    | 0xBC
+`s332_nrf52_6.1.1`    | 0xBA
+`s340_nrf52_6.1.1`    | 0xB9
+
 
 **Note**: The Thread and Zigbee stacks don't use a SoftDevice but --sd-req option is required for compatibility reasons. You can provide any value for the option as it is ignored during DFU.
 
@@ -173,7 +181,7 @@ The following conventions are used on the table:
 
 Combination   | Supported | Notes
 --------------| ----------|-------
-BL            | Yes       |
+BL            | Yes       | **See note 3 below**
 SD            | Yes       | **See note 1 below**
 APP           | Yes       |
 BL + SD       | Yes       |
@@ -187,11 +195,22 @@ SD + APP      | Yes       | **See notes 1 and 2 below**
 was added in nrfutil 3.1.0 and is required since 3.2.0 in case the package should contain SD (+ BL) + APP. Also, since version 3.2.0 the new ID is copied to `--sd-req` list so that
 in case of a link loss during APP update the DFU process can be restarted. In that case the new SD would overwrite itself, so `--sd-req` must contain also the ID of the new SD.
 
-The boolean option '--zigbee' enables the generation of Zigbee update file in addition to the zip package. The following example demonstrates the generation of such update file:
+**Note 3:** When creating update packages of bootloaders compiled from nRF5 SDK 15.3.0 and higher, nrfutil version 5.0.0 must be used. This is because of changes to the bootloader projects in the nRF5 SDK, and if an old nrfutil version is used the size of the generated packages
+will be too large.
+
+Boot validation for a SD or APP update can be activated by setting the `--sd-boot-validation` or `--app-boot-validation` to the preferred
+validation method. When boot validation is set, the bootloader will store the validation data (signature, hash or checksum) of the SD and/or
+APP in the bootloader setting page and verify the firmware in flash with the validation data on every boot. This is only supported by
+bootloaders using bootloader settings version 2, and is supported for both package and settings generation. See 'settings' for more
+information on bootloader settings versions.
+
+Update packages of external applications, e.g. updates that are intended for a third party, can be generated by setting the `--external-app` option. When this option is set the receiving device will store the received update, but not activate it. Note: This functionality is experimental in the  nRF5 SDK and not yet used in any examples.
+
+The boolean option `--zigbee` enables the generation of Zigbee update file in addition to the zip package. The following example demonstrates the generation of such update file:
 ```
 nrfutil pkg generate --hw-version 52 --sd-req 0 --application-version 0x01020101 --application nrf52840_xxaa.hex --key-file ../priv.pem app_dfu_package.zip --zigbee True --manufacturer-id 0xCAFE --image-type 0x1234 --comment good_image
 ```
-**Note 3:** The generated Zigbee update file is named according to the recommendation of the Zigbee Specification ([Zigbee Cluster Library Specification 11.5 - Zigbee Document 07-5123-06](http://www.zigbee.org/~zigbeeor/wp-content/uploads/2014/10/07-5123-06-zigbee-cluster-library-specification.pdf)), so the user doesn't provide the name of the Update file.
+**Note 4:** The generated Zigbee update file is named according to the recommendation of the Zigbee Specification ([Zigbee Cluster Library Specification 11.5 - Zigbee Document 07-5123-06](http://www.zigbee.org/~zigbeeor/wp-content/uploads/2014/10/07-5123-06-zigbee-cluster-library-specification.pdf)), so the user doesn't provide the name of the Update file.
 
 ##### display
 Use this option to display the contents of a DFU package in a .zip file.
@@ -200,9 +219,19 @@ nrfutil pkg display package.zip
 ```
 
 #### dfu
-This set of commands allow you to perform an actual firmware update over a serial, BLE, Thread or Zigbee connection.
+This set of commands allow you to perform an actual firmware update over a serial, BLE, Thread, Zigbee or ANT connection.
 
 **Note**: When using Homebrew Python on macOS, you may encounter an error: `Fatal Python error: PyThreadState_Get: no current thread Abort trap: 6`. See [issue #46](https://github.com/NordicSemiconductor/pc-nrfutil/issues/46#issuecomment-383930818).
+
+##### ant
+Perform a full DFU procedure over an ANT connection. This command takes several options that you can list using:
+```
+nrfutil dfu ant --help
+```
+Below is an example of the execution of a DFU procedure of the file generated above over ANT using an nRF52 connectivity IC connected to COM3:
+```
+nrfutil dfu ant -pkg app_dfu_package.zip --port 0
+```
 
 ##### ble
 Perform a full DFU procedure over a BLE connection. This command takes several options that you can list using:
@@ -261,21 +290,31 @@ Below is an example of the execution of a DFU procedure of the file generated ab
 nrfutil dfu serial -pkg app_dfu_package.zip -p COM3
 ```
 
-##### usb_serial
+Alternatively, the serial number of a connected device can be specified:
+```
+nrfutil dfu serial -pkg app_dfu_package.zip -snr 00FEFEAB1234
+```
+
+##### usb-serial
 
 Perform a full DFU procedure over a CDC ACM USB connection (A.K.A. "USB virtual serial port"). The DFU target shall be a chip with USB pins (i.e. nRF52840), and shall be running a bootloader enabling a USB-CDC interface.
 
-In the case of the nRF52840 development kit board, the `usb_serial` DFU mode is used when communicating with the board through the female USB port marked "nRF USB", which is wired
+In the case of the nRF52840 development kit board, the `usb-serial` DFU mode is used when communicating with the board through the female USB port marked "nRF USB", which is wired
 to the USB pins in the nRF chip.
 
 ```
-nrfutil dfu usb_serial --help
+nrfutil dfu usb-serial --help
 ```
 
 Below is an example of the execution of a DFU procedure of the file generated above over COM3:
 
 ```
-nrfutil dfu usb_serial -pkg app_dfu_package.zip -p COM3
+nrfutil dfu usb-serial -pkg app_dfu_package.zip -p COM3
+```
+
+Alternatively, the serial number of a connected device can be specified:
+```
+nrfutil dfu usb-serial -pkg app_dfu_package.zip -snr 00FEFEAB1234
 ```
 
 #### keys
@@ -329,9 +368,14 @@ The `--bl-settings-version` depends on the SDK version used. Check the following
 
 SDK Version   | BL Settings Version
 ------------- | -------------------
-12.0          | 1
+12.0 -        | 1
+15.3.0 -      | 2
 
 The Bootloader DFU settings version supported and used by the SDK you are using can be found in `nrf_dfu_types.h` in the `bootloader` library.
+Even though bootloaders compiled from nRF5 SDK 15.3.0 and higher only use version 2, they can be configured to support settings pages of version 1.
+If a new bootloader boots with a version 1 settings page, the bootloader will translate the settings page to version 2 before booting. When using
+settings page version 2, boot validation for SD and APP can be generated with the settings page using the `--sd-boot-validation` and
+`--app-boot-validation` in the same way as for DFU packages.
 
 ##### display
 
@@ -347,6 +391,18 @@ nrfutil settings display flash_dump.hex
 
 #### version
 This command displays the version of nrfutil.
+
+#### zigbee
+
+Use this command to issue some zigbee-only related commands. Currently only generation of production config is supported.
+
+##### production_config
+
+Use this option to generate the production config .hex file out of the production config description in YAML format. You can provide the offset where the hex should be located.
+
+```
+nrfutil zigbee production_config config_description.yaml config_hex.hex --offset 0xFC000
+```
 
 ## Init Packet customisation
 

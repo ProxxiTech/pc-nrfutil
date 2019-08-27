@@ -47,6 +47,7 @@ from spinel.stream import StreamOpen
 from spinel.codec import WpanApi
 from spinel.const import SPINEL
 import collections
+import spinel.util as util
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,7 @@ class NCPTransport():
     CFG_KEY_CHANNEL = 'channel'
     CFG_KEY_PANID = 'panid'
     CFG_KEY_RESET = 'reset'
+    CFG_KEY_MASTERKEY = 'masterkey'
 
     def __init__(self, port, stream_descriptor, config = None):
         self._port = port
@@ -98,8 +100,9 @@ class NCPTransport():
             (SPINEL.PROP_THREAD_RLOC16_DEBUG_PASSTHRU, 1, 'B'),
             (SPINEL.PROP_PHY_CHAN, self._config[self.CFG_KEY_CHANNEL], 'H'),
             (SPINEL.PROP_MAC_15_4_PANID, self._config[self.CFG_KEY_PANID], 'H'),
+            (SPINEL.PROP_NET_MASTER_KEY, self._config[self.CFG_KEY_MASTERKEY], '16s'),
             (SPINEL.PROP_NET_IF_UP, 1, 'B'),
-            (SPINEL.PROP_NET_STACK_UP, 2, 'B'),
+            (SPINEL.PROP_NET_STACK_UP, 1, 'B'),
         ]
         self._set_property(*props)
 
@@ -114,13 +117,11 @@ class NCPTransport():
 
     def _wpan_receive(self, prop, value, tid):
         consumed = False
-
         if prop == SPINEL.PROP_STREAM_NET:
             consumed = True
             try:
-                pkt = self._udp6_parser.parse(io.BytesIO(value[2:]),
+                pkt = self._udp6_parser.parse(io.BytesIO(value),
                                               spinel.common.MessageInfo())
-
                 endpoint = collections.namedtuple('endpoint', 'addr port')
                 payload = str(pkt.upper_layer_protocol.payload.to_bytes())
                 src = endpoint(pkt.ipv6_header.source_address,
@@ -148,9 +149,10 @@ class NCPTransport():
 
     @classmethod
     def get_default_config(cls):
-        return {cls.CFG_KEY_CHANNEL: 11,
-                cls.CFG_KEY_PANID:   0xabcd,
-                cls.CFG_KEY_RESET:   True}
+        return {cls.CFG_KEY_CHANNEL:     11,
+                cls.CFG_KEY_PANID:       0xabcd,
+                cls.CFG_KEY_RESET:       True,
+                cls.CFG_KEY_MASTERKEY:   util.hex_to_bytes("00112233445566778899aabbccddeeff")}
 
     def add_ip_address(self, ipaddr):
         valid = 1
@@ -177,8 +179,10 @@ class NCPTransport():
     def send(self, payload, dest):
         if (dest.addr.is_multicast):
             rloc16 = self._wpan.prop_get_value(SPINEL.PROP_THREAD_RLOC16)
+
             # Create an IPv6 Thread RLOC address from mesh-local prefix and RLOC16 MAC address.
             src_addr = ipaddress.ip_address(self._ml_prefix + '\x00\x00\x00\xff\xfe\x00' + struct.pack('>H', rloc16))
+
         else:
             src_addr = self._ml_eid
 
